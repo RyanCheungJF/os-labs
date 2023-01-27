@@ -47,13 +47,20 @@ void insert_node_at(list *lst, int index, int data)
 void delete_node_at(list *lst, int index)
 {
     node *curr = lst->head;
-    for (int i = 0; i < index - 1; i++)
+    if (index == 0)
     {
-        curr = curr->next;
+        lst->head = curr->next;
     }
-    node *temp = curr;
-    curr = curr->next;
-    temp->next = curr->next;
+    else
+    {
+        for (int i = 0; i < index - 1; i++)
+        {
+            curr = curr->next;
+        }
+        node *temp = curr;
+        curr = curr->next;
+        temp->next = curr->next;
+    }
     free(curr);
 }
 
@@ -91,10 +98,10 @@ void reverse_list(list *lst)
 
     while (curr != NULL)
     {
+        // store after curr
         nxt = curr->next;
         // reverse order
         curr->next = prev;
-        nxt->next = curr;
         // swap pointers
         prev = curr;
         curr = nxt;
