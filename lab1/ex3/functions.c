@@ -6,22 +6,27 @@
 
 #include "functions.h"
 
-int add_one(int x) {
+int add_one(int x)
+{
     return x + 1;
 }
 
-int add_two(int x) {
+int add_two(int x)
+{
     return x + 2;
 }
 
-int multiply_five(int x) {
+int multiply_five(int x)
+{
     return x * 5;
 }
 
-int square(int x) {
+int square(int x)
+{
     return x * x;
 }
 
-int cube(int x) {
+int cube(int x)
+{
     return x * x * x;
 }
