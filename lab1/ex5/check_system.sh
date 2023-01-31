@@ -15,9 +15,11 @@ machine_hardware=$(uname -m)
 max_process_id=$(cat /proc/sys/kernel/pid_max)
 # ps shows the processes, -u specifies user, wc -l wordcount line turns the output into lines
 user_process_count=$(ps -u $USER | wc -l)
-#
-user_with_most_processes=$(ps -eo user|sort|uniq -c|sort -n|tail -1|awk '{print $2}')
-#
+# ps -eo user gets security info, uniq -c removes repeated lines and adds a prefix/ counter (prefix, name), 
+# sort -n sorts according to numerical value, tail -1 gets the last entry, awk $2 to filter out the name of the process
+user_with_most_processes=$(ps -eo user | sort | uniq -c | sort -n | tail -1 | awk '{print $2}')
+# free shows free, physical and swap memory, grep filters for word Mem, awk can do computations, 
+# in this case it takes 4th param, free memory and 2nd param, total memory to calculate the percentage
 mem_free_percentage=$(free | grep Mem | awk '{print$4/$2 * 100.0}')
 
 echo "Hostname: $hostname"
