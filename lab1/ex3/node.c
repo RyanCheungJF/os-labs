@@ -164,6 +164,7 @@ void map(list *lst, int (*func)(int))
     node *curr = lst->head;
     while (curr != NULL)
     {
+        // applies function pointer to data
         curr->data = func(curr->data);
         curr = curr->next;
     }
