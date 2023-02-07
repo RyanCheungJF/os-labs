@@ -11,7 +11,7 @@
 hostname=$(hostname)
 # prints system info, -m flag for machine hardware name
 machine_hardware=$(uname -m)
-#
+# cat concat files to std output
 max_process_id=$(cat /proc/sys/kernel/pid_max)
 # ps shows the processes, -u specifies user, wc -l wordcount line turns the output into lines
 user_process_count=$(ps -u $USER | wc -l)
