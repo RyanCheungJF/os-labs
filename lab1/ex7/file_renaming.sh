@@ -21,18 +21,21 @@
 #################### Steps ####################
 
 # Fill in the code to request user for the prefix
-read -p $'Enter prefix (only alphabets):\n' prefix
+echo -p $'Enter prefix (only alphabets):' 
+read prefix
 
 # Check the validity of the prefix #
 if ! [[ $prefix =~ ^[A-Za-z]+$ ]]
 then
     echo "INVALID"
     # Fill in the code to request user for the new prefix
-    read -p $'Please enter a valid prefix [a-z A-Z]:\n' prefix
+    echo $'Please enter a valid prefix [a-z A-Z]:'
+    read prefix
 fi
 
 # Enter numbers and create files #
-read -p $'Number of files to create:\n' N
+echo $'Number of files to create:'
+read N
 
 echo Enter "$N" numbers:
 for (( i=1; i<=$N; i++ ))
@@ -42,7 +45,8 @@ do
     then
         echo "INVALID"
         # Fill in the code to request user for the new prefix
-        read -p $'Please enter a valid number [0-9]:\n' num
+        echo $'Please enter a valid number [0-9]:'
+        read num
     fi
     # Create variables
     # eval "n$i=$num"
@@ -55,14 +59,16 @@ ls *.txt
 echo ""
 
 # Renaming to new prefix #
-read -p $'Enter NEW prefix (only alphabets):\n' newPrefix
+echo $'Enter NEW prefix (only alphabets):' 
+read newPrefix
 
 # Check the validity of the prefix #
 if ! [[ $newPrefix =~ ^[A-Za-z]+$ ]]
 then
     echo "INVALID"
     # Fill in the code to request user for the new prefix
-    read -p $'Please enter a valid prefix [a-z A-Z]:\n' newPrefix
+    echo $'Please enter a valid prefix [a-z A-Z]:' 
+    read newPrefix
 fi
 
 for f in ${prefix}_*.txt
