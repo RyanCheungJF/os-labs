@@ -21,7 +21,7 @@
 #################### Steps ####################
 
 # Fill in the code to request user for the prefix
-echo -p $'Enter prefix (only alphabets):' 
+echo $'Enter prefix (only alphabets):'
 read prefix
 
 # Check the validity of the prefix #
@@ -59,7 +59,7 @@ ls *.txt
 echo ""
 
 # Renaming to new prefix #
-echo $'Enter NEW prefix (only alphabets):' 
+echo $'Enter NEW prefix (only alphabets):'
 read newPrefix
 
 # Check the validity of the prefix #
@@ -67,7 +67,7 @@ if ! [[ $newPrefix =~ ^[A-Za-z]+$ ]]
 then
     echo "INVALID"
     # Fill in the code to request user for the new prefix
-    echo $'Please enter a valid prefix [a-z A-Z]:' 
+    echo $'Please enter a valid prefix [a-z A-Z]:'
     read newPrefix
 fi
 
