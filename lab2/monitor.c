@@ -11,12 +11,14 @@ ssize_t fork_cnt = 0;
 const char *sep =
     "============================================================\n";
 
-void sigusr2_handler(int sig) {
+void sigusr2_handler(int sig)
+{
     (void)(sig);
 
     fork_cnt++;
 
-    if (fork_cnt >= MAX_FORK) {
+    if (fork_cnt >= MAX_FORK)
+    {
         fputs(sep, stderr);
         fputs("YOU ARE HITTING THE FORK LIMIT\n", stderr);
         fputs(sep, stderr);
@@ -25,8 +27,10 @@ void sigusr2_handler(int sig) {
     }
 }
 
-int main(int argc, const char *argv[]) {
-    if (argc < 2) {
+int main(int argc, const char *argv[])
+{
+    if (argc < 2)
+    {
         fputs("Missing executable file\n", stderr);
         exit(EXIT_FAILURE);
     }
@@ -38,7 +42,8 @@ int main(int argc, const char *argv[]) {
     char monitor_pid[16];
     sprintf(monitor_pid, "%d", getpid());
 
-    if (fork() == 0) {
+    if (fork() == 0)
+    {
         signal(SIGUSR2, SIG_DFL);
         signal(SIGTSTP, SIG_DFL);
         signal(SIGINT, SIG_DFL);
@@ -48,8 +53,10 @@ int main(int argc, const char *argv[]) {
     }
 
     int wstatus;
-    while (waitpid(-1, &wstatus, WUNTRACED) > 0) {
-        if (WIFSTOPPED(wstatus)) {
+    while (waitpid(-1, &wstatus, WUNTRACED) > 0)
+    {
+        if (WIFSTOPPED(wstatus))
+        {
             kill(getpid(), SIGSTOP);
         }
     }

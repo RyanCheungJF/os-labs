@@ -7,14 +7,17 @@ static fork_t __fork = NULL;
 
 extern pid_t __monitor_pid;
 
-__pid_t fork() {
+__pid_t fork()
+{
 
     pid_t pid;
-    if (__fork == NULL) {
+    if (__fork == NULL)
+    {
         __fork = dlsym(RTLD_NEXT, "fork");
     }
 
-    if ((pid = __fork()) == 0 && __monitor_pid) {
+    if ((pid = __fork()) == 0 && __monitor_pid)
+    {
         kill(__monitor_pid, SIGUSR2);
     }
 
