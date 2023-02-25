@@ -19,7 +19,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define NOT_IN_USE -1
+#define NOT_EXITED -1
+#define UNUSED 0
+#define EXITED 1
+#define RUNNING 2
+#define TERMINATING 3
+#define STOPPED 4
 static struct PCBTable processArr[MAX_PROCESSES];
 
 /*******************************************************************************
@@ -35,8 +40,13 @@ static void signal_handler(int signo)
 
 static void proc_update_status(pid_t pid, int status, int exitCode)
 {
+    // for (int i = 0; i < 5; i++)
+    // {
+    //     printf("%d %d %d\n", processArr[i].pid, processArr[i].status, processArr[i].exitCode);
+    // }
+
     int i = 0;
-    while (i < MAX_PROCESSES && processArr[i].status != 0)
+    while (i < MAX_PROCESSES && processArr[i].status != UNUSED)
     {
         if (processArr[i].pid == pid)
         {
@@ -57,9 +67,9 @@ static void clean_up_proc()
     // clean up process if done
     for (int i = 0; i < MAX_PROCESSES; i++)
     {
-        if ((p = waitpid(processArr[i].pid, &status, WNOHANG)) == processArr[i].pid)
+        if (processArr[i].pid != UNUSED && ((p = waitpid(processArr[i].pid, &status, WNOHANG)) == processArr[i].pid))
         {
-            proc_update_status(p, 1, 0);
+            proc_update_status(p, EXITED, 0);
         }
     }
 }
@@ -85,15 +95,20 @@ static void command_info(char *n)
         // status logging
         for (int i = 0; i < MAX_PROCESSES; i++)
         {
-            if (processArr[i].status == 1)
+            if (processArr[i].status == EXITED)
             {
                 // exited process
-                printf("[%d] %s %d\n", processArr[i].pid, "Exited", processArr[i].status);
+                printf("[%d] %s %d\n", processArr[i].pid, "Exited", processArr[i].exitCode);
             }
-            else if (processArr[i].status == 2)
+            else if (processArr[i].status == RUNNING)
             {
                 // running process
                 printf("[%d] %s\n", processArr[i].pid, "Running");
+            }
+            else if (processArr[i].status == TERMINATING)
+            {
+                // terminating process
+                printf("[%d] %s\n", processArr[i].pid, "Terminating");
             }
         }
     }
@@ -102,7 +117,7 @@ static void command_info(char *n)
         // exited processes
         for (int i = 0; i < MAX_PROCESSES; i++)
         {
-            if (processArr[i].status == 1)
+            if (processArr[i].status == EXITED)
             {
                 counter++;
             }
@@ -114,12 +129,24 @@ static void command_info(char *n)
         // running processes
         for (int i = 0; i < MAX_PROCESSES; i++)
         {
-            if (processArr[i].status == 2)
+            if (processArr[i].status == RUNNING)
             {
                 counter++;
             }
         }
         printf("Total running process: %d\n", counter);
+    }
+    else if (strcmp(n, "3") == 0)
+    {
+        // running processes
+        for (int i = 0; i < MAX_PROCESSES; i++)
+        {
+            if (processArr[i].status == TERMINATING)
+            {
+                counter++;
+            }
+        }
+        printf("Total terminating process: %d\n", counter);
     }
     else
     {
@@ -128,8 +155,23 @@ static void command_info(char *n)
     }
 }
 
-static void command_wait(/* pass necessary parameters*/)
+static void command_wait(char *n)
 {
+    // convert string to int
+    int p = atoi(n);
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+        if (p == processArr[i].pid && processArr[i].status == RUNNING)
+        {
+            // block and wait
+            int status;
+            if (waitpid(p, &status, WUNTRACED) > 0)
+            {
+                // update PCB table with new status and exit code
+                proc_update_status(p, EXITED, WEXITSTATUS(status));
+            }
+        }
+    }
 
     /******* FILL IN THE CODE *******/
 
@@ -139,7 +181,7 @@ static void command_wait(/* pass necessary parameters*/)
     // Else, continue accepting user commands.
 }
 
-static void command_terminate(/* pass necessary parameters*/)
+static void command_terminate(char *n)
 {
 
     /******* FILL IN THE CODE *******/
@@ -148,6 +190,18 @@ static void command_terminate(/* pass necessary parameters*/)
     // If {PID} is RUNNING:
     // Terminate it by using kill() to send SIGTERM
     // The state of {PID} should be “Terminating” until {PID} exits
+    // convert string to int
+    int p = atoi(n);
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+        if (p == processArr[i].pid && processArr[i].status == RUNNING)
+        {
+            // send SIGTERM with kill() to terminate
+            int exitCode = kill(p, SIGTERM);
+            processArr[i].status = TERMINATING;
+            processArr[i].exitCode = exitCode;
+        }
+    }
 }
 
 static void command_fg(/* pass necessary parameters*/)
@@ -196,7 +250,7 @@ static void command_exec(int num_tokens, char **argList)
         execv(filePath, argList);
         // exit child process
         // 0 indicates successful exit
-        exit(0);
+        _exit(0);
 
         // check file redirection operation is present : ex3
 
@@ -209,13 +263,12 @@ static void command_exec(int num_tokens, char **argList)
     {
         // parent process
         // register process in PCB table
-        proc_update_status(pid, 2, -1);
+        proc_update_status(pid, RUNNING, NOT_EXITED);
 
         if (ampersandFlag)
         {
             // let child run in background
             printf("Child [%d] in background\n", pid);
-            // waitpid(pid, &status, WNOHANG);
         }
         else
         {
@@ -223,7 +276,7 @@ static void command_exec(int num_tokens, char **argList)
             if (waitpid(pid, &status, WUNTRACED) > 0)
             {
                 // update PCB table with new status and exit code
-                proc_update_status(pid, 1, WEXITSTATUS(status));
+                proc_update_status(pid, EXITED, WEXITSTATUS(status));
             }
         }
         // Use waitpid() with WNOHANG when not blocking during wait and  waitpid() with WUNTRACED when parent needs to block due to wait
@@ -247,6 +300,18 @@ static void command(size_t num_tokens, char **tokens)
             // advance to arg after info
             iterator++;
             command_info(tokens[iterator]);
+            iterator++;
+        }
+        else if (strcmp(tokens[iterator], "wait") == 0)
+        {
+            iterator++;
+            command_wait(tokens[iterator]);
+            iterator++;
+        }
+        else if (strcmp(tokens[iterator], "terminate") == 0)
+        {
+            iterator++;
+            command_terminate(tokens[iterator]);
             iterator++;
         }
         else
