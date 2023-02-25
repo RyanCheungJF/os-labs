@@ -19,9 +19,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define ARR_SIZE 50
 #define NOT_IN_USE -1
-static struct PCBTable processArr[ARR_SIZE];
+static struct PCBTable processArr[MAX_PROCESSES];
 
 /*******************************************************************************
  * Signal handler : ex4
@@ -34,14 +33,35 @@ static void signal_handler(int signo)
     // Update the status of the process in the PCB table
 }
 
-static void proc_update_status(/* pass necessary parameters*/)
+static void proc_update_status(pid_t pid, int status, int exitCode)
 {
+    int i = 0;
+    while (i < MAX_PROCESSES && processArr[i].status != 0)
+    {
+        if (processArr[i].pid == pid)
+        {
+            // update entry
+            break;
+        }
+        // else find unused entry
+        i++;
+    }
+    processArr[i].pid = pid;
+    processArr[i].status = status;
+    processArr[i].exitCode = exitCode;
+}
 
-    /******* FILL IN THE CODE *******/
-
-    // Call everytime you need to update status and exit code of a process in PCBTable
-
-    // May use WIFEXITED, WEXITSTATUS, WIFSIGNALED, WTERMSIG, WIFSTOPPED
+static void clean_up_proc()
+{
+    int p, status;
+    // clean up process if done
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+        if ((p = waitpid(processArr[i].pid, &status, WNOHANG)) == processArr[i].pid)
+        {
+            proc_update_status(p, 1, 0);
+        }
+    }
 }
 
 /*******************************************************************************
@@ -57,31 +77,30 @@ static void command_info(char *n)
         return;
     }
 
+    clean_up_proc();
+
     int counter = 0;
     if (strcmp(n, "0") == 0)
     {
         // status logging
-        for (int i = 0; i < ARR_SIZE; i++)
+        for (int i = 0; i < MAX_PROCESSES; i++)
         {
-            if (processArr[i].status != NOT_IN_USE)
+            if (processArr[i].status == 1)
             {
-                if (processArr[i].status == 1)
-                {
-                    // exit
-                    printf("[%d] %s, %d", processArr[i].pid, "Exited", processArr[i].status);
-                }
-                else if (processArr[i].status == 2)
-                {
-                    // running
-                    printf("[%d] %s", processArr[i].pid, "Running");
-                }
+                // exited process
+                printf("[%d] %s %d\n", processArr[i].pid, "Exited", processArr[i].status);
+            }
+            else if (processArr[i].status == 2)
+            {
+                // running process
+                printf("[%d] %s\n", processArr[i].pid, "Running");
             }
         }
     }
     else if (strcmp(n, "1") == 0)
     {
         // exited processes
-        for (int i = 0; i < ARR_SIZE; i++)
+        for (int i = 0; i < MAX_PROCESSES; i++)
         {
             if (processArr[i].status == 1)
             {
@@ -93,7 +112,7 @@ static void command_info(char *n)
     else if (strcmp(n, "2") == 0)
     {
         // running processes
-        for (int i = 0; i < ARR_SIZE; i++)
+        for (int i = 0; i < MAX_PROCESSES; i++)
         {
             if (processArr[i].status == 2)
             {
@@ -146,19 +165,38 @@ static void command_fg(/* pass necessary parameters*/)
  * Program Execution
  ******************************************************************************/
 
-static void command_exec(/* pass necessary parameters*/)
+static void command_exec(int num_tokens, char **argList)
 {
+    const char *filePath = argList[0];
+    // check if program exists and is executable
+    // F_OK indicates existence of file
+    // R_OK indicates readable file
+    // X_OK checks for execution permission bit
+    if (access(filePath, F_OK & R_OK & X_OK) == -1)
+    {
+        printf("%s not found\n", filePath);
+        return;
+    }
 
-    /******* FILL IN THE CODE *******/
-
-    // check if program exists and is executable : use access()
+    // checks if our list of args has an ampersand
+    // ampersand used to indicate running background process
+    // when passing it to execv, this might be an unrecognized arg, so we reset it to NULL
+    bool ampersandFlag = (strcmp(argList[num_tokens - 1], "&") == 0);
+    if (ampersandFlag)
+    {
+        argList[num_tokens - 1] = NULL;
+    }
 
     // fork a subprocess and execute the program
-
+    int status;
     pid_t pid;
     if ((pid = fork()) == 0)
     {
-        // CHILD PROCESS
+        // child process
+        execv(filePath, argList);
+        // exit child process
+        // 0 indicates successful exit
+        exit(0);
 
         // check file redirection operation is present : ex3
 
@@ -166,23 +204,28 @@ static void command_exec(/* pass necessary parameters*/)
         // use fopen/open file to open the file for reading/writing with  permission O_RDONLY, O_WRONLY, O_CREAT, O_TRUNC, O_SYNC and 0644
         // use dup2 to redirect the stdin, stdout and stderr to the files
         // call execv() to execute the command in the child process
-
-        // else : ex1, ex2
-        // call execv() to execute the command in the child process
-
-        // Exit the child
     }
     else
     {
+        // parent process
+        // register process in PCB table
+        proc_update_status(pid, 2, -1);
 
-        // PARENT PROCESS
-        // register the process in process table
-
-        // If  child process need to execute in the background  (if & is present at the end )
-        // print Child [PID] in background
-
-        // else wait for the child process to exit
-
+        if (ampersandFlag)
+        {
+            // let child run in background
+            printf("Child [%d] in background\n", pid);
+            // waitpid(pid, &status, WNOHANG);
+        }
+        else
+        {
+            // we block and wait
+            if (waitpid(pid, &status, WUNTRACED) > 0)
+            {
+                // update PCB table with new status and exit code
+                proc_update_status(pid, 1, WEXITSTATUS(status));
+            }
+        }
         // Use waitpid() with WNOHANG when not blocking during wait and  waitpid() with WUNTRACED when parent needs to block due to wait
     }
 }
@@ -191,17 +234,36 @@ static void command_exec(/* pass necessary parameters*/)
  * Command Processor
  ******************************************************************************/
 
-static void command(/* pass necessary parameters*/)
+static void command(size_t num_tokens, char **tokens)
 {
-
-    /******* FILL IN THE CODE *******/
-
-    // if command is "info" call command_info()             : ex1
-    // if command is "wait" call command_wait()             : ex2
-    // if command is "terminate" call command_terminate()   : ex2
-    // if command is "fg" call command_fg()                 : ex4
-
-    // call command_exec() for all other commands           : ex1, ex2, ex3
+    // parse tokens
+    int iterator = 0;
+    // we dont handle NULL terminator
+    while ((size_t)iterator < num_tokens - 1)
+    {
+        // doing strcmp on NULL tokens will cause a force exit
+        if (strcmp(tokens[iterator], "info") == 0)
+        {
+            // advance to arg after info
+            iterator++;
+            command_info(tokens[iterator]);
+            iterator++;
+        }
+        else
+        {
+            // asking to execute a program
+            char *argList[50] = {NULL};
+            int i = 0;
+            while ((size_t)iterator < num_tokens - 1)
+            {
+                argList[i] = tokens[iterator];
+                iterator++;
+                i++;
+            }
+            // execv(argList[0], argList);
+            command_exec(i, argList);
+        }
+    }
 }
 
 /*******************************************************************************
@@ -212,13 +274,6 @@ void my_init(void)
 {
     // use signal() with SIGTSTP to setup a signalhandler for ctrl+z : ex4
     // use signal() with SIGINT to setup a signalhandler for ctrl+c  : ex4
-
-    // anything else you require
-
-    for (int iterator = 0; iterator < ARR_SIZE; iterator++)
-    {
-        processArr[iterator].status = NOT_IN_USE;
-    }
 }
 
 void my_process_command(size_t num_tokens, char **tokens)
@@ -231,20 +286,7 @@ void my_process_command(size_t num_tokens, char **tokens)
 
     // initialize PCB array
     my_init();
-
-    // parse tokens
-    int iterator = 0;
-    while ((size_t)iterator < num_tokens)
-    {
-        // doing strcmp on NULL tokens will cause a force exit
-        if (tokens[iterator] && strcmp(tokens[iterator], "info") == 0)
-        {
-            // advance to arg after info
-            iterator++;
-            command_info(tokens[iterator]);
-        }
-        iterator++;
-    }
+    command(num_tokens, tokens);
 
     // debug tools
     // int iterator;
@@ -256,9 +298,14 @@ void my_process_command(size_t num_tokens, char **tokens)
 
 void my_quit(void)
 {
-
-    /******* FILL IN THE CODE *******/
-    // Kill every process in the PCB that is either stopped or running
-
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+        // kill every process in the PCB that is either stopped or running
+        if (processArr[i].status == 2 || processArr[i].status == 4)
+        {
+            kill(processArr[i].pid, SIGKILL);
+            printf("Killing [%d]\n", processArr[i].pid);
+        }
+    }
     printf("\nGoodbye\n");
 }
