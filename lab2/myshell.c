@@ -69,7 +69,14 @@ static void clean_up_proc()
     {
         if (processArr[i].pid != UNUSED && ((p = waitpid(processArr[i].pid, &status, WNOHANG)) == processArr[i].pid))
         {
-            proc_update_status(p, EXITED, 0);
+            if (WIFSIGNALED(status))
+            {
+                proc_update_status(p, EXITED, WTERMSIG(status));
+            }
+            else
+            {
+                proc_update_status(p, EXITED, 0);
+            }
         }
     }
 }
@@ -196,10 +203,9 @@ static void command_terminate(char *n)
     {
         if (p == processArr[i].pid && processArr[i].status == RUNNING)
         {
-            // send SIGTERM with kill() to terminate
-            int exitCode = kill(p, SIGTERM);
+            // send SIGTERM with kill() to terminate, SIGTERM = SIGnal + TERMinate
+            kill(p, SIGTERM);
             processArr[i].status = TERMINATING;
-            processArr[i].exitCode = exitCode;
         }
     }
 }
@@ -318,15 +324,26 @@ static void command(size_t num_tokens, char **tokens)
         {
             // asking to execute a program
             char *argList[50] = {NULL};
-            int i = 0;
+            int index = 0;
             while ((size_t)iterator < num_tokens - 1)
             {
-                argList[i] = tokens[iterator];
+                // check for chained commands
+                while ((size_t)iterator < num_tokens - 1 && strcmp(tokens[iterator], ";") != 0)
+                {
+                    argList[index] = tokens[iterator];
+                    iterator++;
+                    index++;
+                }
+                // we've now parsed a single whole command, so send it over
+                command_exec(index, argList);
+                // reset the array
+                for (int i = 0; i < index; i++)
+                {
+                    argList[i] = NULL;
+                }
+                index = 0;
                 iterator++;
-                i++;
             }
-            // execv(argList[0], argList);
-            command_exec(i, argList);
         }
     }
 }
@@ -368,6 +385,7 @@ void my_quit(void)
         // kill every process in the PCB that is either stopped or running
         if (processArr[i].status == 2 || processArr[i].status == 4)
         {
+            // SIGKILL for immediate termination
             kill(processArr[i].pid, SIGKILL);
             printf("Killing [%d]\n", processArr[i].pid);
         }
