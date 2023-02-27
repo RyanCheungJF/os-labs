@@ -179,24 +179,10 @@ static void command_wait(char *n)
             }
         }
     }
-
-    /******* FILL IN THE CODE *******/
-
-    // Find the {PID} in the PCBTable
-    // If the process indicated by the process id is RUNNING, wait for it (can use waitpid()).
-    // After the process terminate, update status and exit code (call proc_update_status())
-    // Else, continue accepting user commands.
 }
 
 static void command_terminate(char *n)
 {
-
-    /******* FILL IN THE CODE *******/
-
-    // Find the pid in the PCBTable
-    // If {PID} is RUNNING:
-    // Terminate it by using kill() to send SIGTERM
-    // The state of {PID} should be “Terminating” until {PID} exits
     // convert string to int
     int p = atoi(n);
     for (int i = 0; i < MAX_PROCESSES; i++)
@@ -253,17 +239,74 @@ static void command_exec(int num_tokens, char **argList)
     if ((pid = fork()) == 0)
     {
         // child process
+        bool in = false, out = false, err = false;
+        char inputFileName[64], outputFileName[64], errorFileName[64];
+        // checks for file redirection
+        for (int i = 0; i < num_tokens; i++)
+        {
+            if (argList[i] && strcmp(argList[i], "<") == 0)
+            {
+                argList[i] = NULL;
+                // copy file name of STDIN
+                strcpy(inputFileName, argList[i + 1]);
+                in = true;
+            }
+            if (argList[i] && strcmp(argList[i], ">") == 0)
+            {
+                argList[i] = NULL;
+                // copy file name of STDOUT
+                strcpy(outputFileName, argList[i + 1]);
+                out = true;
+            }
+            if (argList[i] && strcmp(argList[i], "2>") == 0)
+            {
+                argList[i] = NULL;
+                // copy file name of STDERR
+                strcpy(errorFileName, argList[i + 1]);
+                err = true;
+            }
+        }
+
+        // if STDIN is present, change file descriptors
+        if (in)
+        {
+            int fd;
+            // check if we file exists to read from
+            if (access(inputFileName, F_OK) == -1)
+            {
+                printf("%s does not exist\n", inputFileName);
+                return;
+            }
+            fd = open(inputFileName, O_RDONLY);
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+        }
+        // if STDOUT is present, change file descriptors
+        if (out)
+        {
+            int fd;
+            // create file we want to write too
+            // 0644 flag means user can read and write, group and others can read
+            fd = creat(outputFileName, 0644);
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+        // if STDERR is present, change file descriptors
+        if (err)
+        {
+            int fd;
+            // create file we want to write too
+            // 0644 flag means user can read and write, group and others can read
+            fd = creat(errorFileName, 0644);
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+        }
+
+        // execute as per normal
         execv(filePath, argList);
         // exit child process
         // 0 indicates successful exit
         _exit(0);
-
-        // check file redirection operation is present : ex3
-
-        // if < or > or 2> present:
-        // use fopen/open file to open the file for reading/writing with  permission O_RDONLY, O_WRONLY, O_CREAT, O_TRUNC, O_SYNC and 0644
-        // use dup2 to redirect the stdin, stdout and stderr to the files
-        // call execv() to execute the command in the child process
     }
     else
     {
