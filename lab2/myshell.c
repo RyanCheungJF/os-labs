@@ -268,6 +268,7 @@ static void command_exec(int num_tokens, char **argList)
             if (access(inputFileName, F_OK) == -1)
             {
                 printf("%s does not exist\n", inputFileName);
+                // exit with error code 1
                 _exit(1);
             }
             fd = open(inputFileName, O_RDONLY);
@@ -330,7 +331,7 @@ static void command_exec(int num_tokens, char **argList)
 
 static void command(size_t num_tokens, char **tokens)
 {
-    // clean up processes
+    // clean up at the start of a new command
     clean_up_proc();
     // parse tokens
     int iterator = 0;
