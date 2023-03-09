@@ -40,11 +40,6 @@ static void signal_handler(int signo)
 
 static void proc_update_status(pid_t pid, int status, int exitCode)
 {
-    // for (int i = 0; i < 5; i++)
-    // {
-    //     printf("%d %d %d\n", processArr[i].pid, processArr[i].status, processArr[i].exitCode);
-    // }
-
     int i = 0;
     while (i < MAX_PROCESSES && processArr[i].status != UNUSED)
     {
@@ -93,8 +88,6 @@ static void command_info(char *n)
         printf("Wrong command\n");
         return;
     }
-
-    clean_up_proc();
 
     int counter = 0;
     if (strcmp(n, "0") == 0)
@@ -145,7 +138,7 @@ static void command_info(char *n)
     }
     else if (strcmp(n, "3") == 0)
     {
-        // running processes
+        // terminating processes
         for (int i = 0; i < MAX_PROCESSES; i++)
         {
             if (processArr[i].status == TERMINATING)
@@ -275,7 +268,7 @@ static void command_exec(int num_tokens, char **argList)
             if (access(inputFileName, F_OK) == -1)
             {
                 printf("%s does not exist\n", inputFileName);
-                return;
+                _exit(1);
             }
             fd = open(inputFileName, O_RDONLY);
             dup2(fd, STDIN_FILENO);
@@ -328,7 +321,6 @@ static void command_exec(int num_tokens, char **argList)
                 proc_update_status(pid, EXITED, WEXITSTATUS(status));
             }
         }
-        // Use waitpid() with WNOHANG when not blocking during wait and  waitpid() with WUNTRACED when parent needs to block due to wait
     }
 }
 
@@ -338,6 +330,8 @@ static void command_exec(int num_tokens, char **argList)
 
 static void command(size_t num_tokens, char **tokens)
 {
+    // clean up processes
+    clean_up_proc();
     // parse tokens
     int iterator = 0;
     // we dont handle NULL terminator
