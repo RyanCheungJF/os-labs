@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 // constants
+#define UNUSED -1
 #define RED 1
 #define GREEN 2
 #define BLUE 3
@@ -16,9 +17,9 @@ sem_t blueBallSemaphore;
 int redBalls;
 int greenBalls;
 int blueBalls;
-int redIds[2] = {-1, -1};
-int greenIds[2] = {-1, -1};
-int blueIds[2] = {-1, -1};
+static int redIds[2] = {UNUSED, UNUSED};
+static int greenIds[2] = {UNUSED, UNUSED};
+static int blueIds[2] = {UNUSED, UNUSED};
 
 void packer_init(void)
 {
@@ -42,6 +43,38 @@ void packer_destroy(void)
     sem_destroy(&blueBallSemaphore);
 }
 
+void packer_set_state_array(int id, int **arr)
+{
+    // assumption that the arr we pass is always size 2
+    // simply sets the id into an unused spot
+    if (arr[0] == UNUSED)
+    {
+        arr[0] = id;
+    }
+    else
+    {
+        arr[1] = id;
+    }
+}
+
+int packer_reset_state_array(int id, int **arr)
+{
+    // assumption that the arr we pass is always size 2
+    // simply resets the array after finding the partner and returns the partner
+    int res;
+    if (arr[0] == id)
+    {
+        res = arr[1];
+        arr[1] = UNUSED;
+    }
+    else
+    {
+        res = arr[0];
+        arr[0] = UNUSED;
+    }
+    return res;
+}
+
 int pack_ball(int colour, int id)
 {
     bool trigger = false;
@@ -52,56 +85,33 @@ int pack_ball(int colour, int id)
         sem_wait(&mutex);
         redBalls++;
         // save ids
-        if (redIds[0] == -1)
-        {
-            redIds[0] = id;
-        }
-        else
-        {
-            redIds[1] = id;
-        }
-        // only the second ball triggers this
+        packer_set_state_array(id, redIds);
+
+        // only the second ball triggers this barrier
         if (redBalls == 2)
         {
-            // printf("TRIGGERED %d, %d balls\n", id, redBalls);
+            // only the second ball has the responsibility of resetting shared state
             trigger = true;
             redBalls = 0;
-            if (redIds[0] == id)
-            {
-                res = redIds[1];
-                redIds[1] = -1;
-            }
-            else
-            {
-                res = redIds[0];
-                redIds[0] = -1;
-            }
+            // get partner ball's id
+            res = packer_reset_state_array(id, redIds);
             sem_post(&redBallSemaphore);
         }
         sem_post(&mutex);
 
         if (trigger)
         {
+            // only for the second ball to terminate as we already got our partner's id
             return res;
         }
 
-        // printf("BEFORE BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
         //  first ball blocks here
         sem_wait(&redBallSemaphore);
-        // stores the other id
         sem_wait(&mutex);
-        if (redIds[0] == -1)
-        {
-            res = redIds[1];
-            redIds[1] = -1;
-        }
-        else
-        {
-            res = redIds[0];
-            redIds[0] = -1;
-        }
+        // gets partner's id
+        res = packer_reset_state_array(UNUSED, redIds);
         sem_post(&mutex);
-        // printf("AFTER BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
+        // does not need to signal individual semaphore as we want to reset the barrier
         return res;
     }
     else if (colour == GREEN)
@@ -109,31 +119,13 @@ int pack_ball(int colour, int id)
         // green ball
         sem_wait(&mutex);
         greenBalls++;
-        // save ids
-        if (greenIds[0] == -1)
-        {
-            greenIds[0] = id;
-        }
-        else
-        {
-            greenIds[1] = id;
-        }
-        // only the second ball triggers this
+        packer_set_state_array(id, greenIds);
+
         if (greenBalls == 2)
         {
-            // printf("TRIGGERED %d, %d balls\n", id, redBalls);
             trigger = true;
             greenBalls = 0;
-            if (greenIds[0] == id)
-            {
-                res = greenIds[1];
-                greenIds[1] = -1;
-            }
-            else
-            {
-                res = greenIds[0];
-                greenIds[0] = -1;
-            }
+            res = packer_reset_state_array(id, greenIds);
             sem_post(&greenBallSemaphore);
         }
         sem_post(&mutex);
@@ -143,23 +135,10 @@ int pack_ball(int colour, int id)
             return res;
         }
 
-        // printf("BEFORE BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
-        //  first ball blocks here
         sem_wait(&greenBallSemaphore);
-        // stores the other id
         sem_wait(&mutex);
-        if (greenIds[0] == -1)
-        {
-            res = greenIds[1];
-            greenIds[1] = -1;
-        }
-        else
-        {
-            res = greenIds[0];
-            greenIds[0] = -1;
-        }
+        res = packer_reset_state_array(UNUSED, greenIds);
         sem_post(&mutex);
-        // printf("AFTER BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
         return res;
     }
     else if (colour == BLUE)
@@ -167,31 +146,13 @@ int pack_ball(int colour, int id)
         // blue ball
         sem_wait(&mutex);
         blueBalls++;
-        // save ids
-        if (blueIds[0] == -1)
-        {
-            blueIds[0] = id;
-        }
-        else
-        {
-            blueIds[1] = id;
-        }
-        // only the second ball triggers this
+        packer_set_state_array(id, blueIds);
+
         if (blueBalls == 2)
         {
-            // printf("TRIGGERED %d, %d balls\n", id, redBalls);
             trigger = true;
             blueBalls = 0;
-            if (blueIds[0] == id)
-            {
-                res = blueIds[1];
-                blueIds[1] = -1;
-            }
-            else
-            {
-                res = blueIds[0];
-                blueIds[0] = -1;
-            }
+            res = packer_reset_state_array(id, blueIds);
             sem_post(&blueBallSemaphore);
         }
         sem_post(&mutex);
@@ -201,28 +162,15 @@ int pack_ball(int colour, int id)
             return res;
         }
 
-        // printf("BEFORE BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
-        //  first ball blocks here
         sem_wait(&blueBallSemaphore);
-        // stores the other id
         sem_wait(&mutex);
-        if (blueIds[0] == -1)
-        {
-            res = blueIds[1];
-            blueIds[1] = -1;
-        }
-        else
-        {
-            res = blueIds[0];
-            blueIds[0] = -1;
-        }
+        res = packer_reset_state_array(UNUSED, blueIds);
         sem_post(&mutex);
-        // printf("AFTER BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
         return res;
     }
     else
     {
-        // error
+        // error, not a colour we support
         printf("Colour of ball not recognized, got colour %d and id %d!\n", colour, id);
     }
     return 0;
