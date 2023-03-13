@@ -1,6 +1,7 @@
 #include "packer.h"
 
 #include <semaphore.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 // constants
@@ -43,6 +44,8 @@ void packer_destroy(void)
 
 int pack_ball(int colour, int id)
 {
+    bool trigger = false;
+    int res;
     if (colour == RED)
     {
         // red ball
@@ -60,23 +63,45 @@ int pack_ball(int colour, int id)
         // only the second ball triggers this
         if (redBalls == 2)
         {
+            // printf("TRIGGERED %d, %d balls\n", id, redBalls);
+            trigger = true;
+            redBalls = 0;
+            if (redIds[0] == id)
+            {
+                res = redIds[1];
+                redIds[1] = -1;
+            }
+            else
+            {
+                res = redIds[0];
+                redIds[0] = -1;
+            }
             sem_post(&redBallSemaphore);
         }
         sem_post(&mutex);
 
-        // first ball blocks here
+        if (trigger)
+        {
+            return res;
+        }
+
+        // printf("BEFORE BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
+        //  first ball blocks here
         sem_wait(&redBallSemaphore);
         // stores the other id
-        int res;
-        if (redIds[0] == id)
+        sem_wait(&mutex);
+        if (redIds[0] == -1)
         {
             res = redIds[1];
+            redIds[1] = -1;
         }
         else
         {
             res = redIds[0];
+            redIds[0] = -1;
         }
-        sem_post(&redBallSemaphore);
+        sem_post(&mutex);
+        // printf("AFTER BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
         return res;
     }
     else if (colour == GREEN)
@@ -96,23 +121,45 @@ int pack_ball(int colour, int id)
         // only the second ball triggers this
         if (greenBalls == 2)
         {
+            // printf("TRIGGERED %d, %d balls\n", id, redBalls);
+            trigger = true;
+            greenBalls = 0;
+            if (greenIds[0] == id)
+            {
+                res = greenIds[1];
+                greenIds[1] = -1;
+            }
+            else
+            {
+                res = greenIds[0];
+                greenIds[0] = -1;
+            }
             sem_post(&greenBallSemaphore);
         }
         sem_post(&mutex);
 
-        // first ball blocks here
+        if (trigger)
+        {
+            return res;
+        }
+
+        // printf("BEFORE BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
+        //  first ball blocks here
         sem_wait(&greenBallSemaphore);
         // stores the other id
-        int res;
-        if (greenIds[0] == id)
+        sem_wait(&mutex);
+        if (greenIds[0] == -1)
         {
             res = greenIds[1];
+            greenIds[1] = -1;
         }
         else
         {
             res = greenIds[0];
+            greenIds[0] = -1;
         }
-        sem_post(&greenBallSemaphore);
+        sem_post(&mutex);
+        // printf("AFTER BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
         return res;
     }
     else if (colour == BLUE)
@@ -132,23 +179,45 @@ int pack_ball(int colour, int id)
         // only the second ball triggers this
         if (blueBalls == 2)
         {
+            // printf("TRIGGERED %d, %d balls\n", id, redBalls);
+            trigger = true;
+            blueBalls = 0;
+            if (blueIds[0] == id)
+            {
+                res = blueIds[1];
+                blueIds[1] = -1;
+            }
+            else
+            {
+                res = blueIds[0];
+                blueIds[0] = -1;
+            }
             sem_post(&blueBallSemaphore);
         }
         sem_post(&mutex);
 
-        // first ball blocks here
+        if (trigger)
+        {
+            return res;
+        }
+
+        // printf("BEFORE BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
+        //  first ball blocks here
         sem_wait(&blueBallSemaphore);
         // stores the other id
-        int res;
-        if (blueIds[0] == id)
+        sem_wait(&mutex);
+        if (blueIds[0] == -1)
         {
             res = blueIds[1];
+            blueIds[1] = -1;
         }
         else
         {
             res = blueIds[0];
+            blueIds[0] = -1;
         }
-        sem_post(&blueBallSemaphore);
+        sem_post(&mutex);
+        // printf("AFTER BLOCKED %d, %d balls, arr %d %d\n", id, redBalls, redIds[0], redIds[1]);
         return res;
     }
     else
