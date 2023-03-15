@@ -11,9 +11,9 @@
 #define BLUE 3
 // semaphore declarations
 sem_t mutex;
-sem_t redBallSemaphore;
-sem_t greenBallSemaphore;
-sem_t blueBallSemaphore;
+sem_t redBarrierSemaphore;
+sem_t greenBarrierSemaphore;
+sem_t blueBarrierSemaphore;
 int redBalls;
 int greenBalls;
 int blueBalls;
@@ -26,9 +26,9 @@ void packer_init(void)
     // initialize semaphores to be used with threads
     // sem_init takes in 3 args, name, 0 if shared w threads 1 for processes, init value
     sem_init(&mutex, 0, 1);
-    sem_init(&redBallSemaphore, 0, 0);
-    sem_init(&greenBallSemaphore, 0, 0);
-    sem_init(&blueBallSemaphore, 0, 0);
+    sem_init(&redBarrierSemaphore, 0, 0);
+    sem_init(&greenBarrierSemaphore, 0, 0);
+    sem_init(&blueBarrierSemaphore, 0, 0);
     redBalls = 0;
     greenBalls = 0;
     blueBalls = 0;
@@ -38,12 +38,12 @@ void packer_destroy(void)
 {
     // deinitialize any variables
     sem_destroy(&mutex);
-    sem_destroy(&redBallSemaphore);
-    sem_destroy(&greenBallSemaphore);
-    sem_destroy(&blueBallSemaphore);
+    sem_destroy(&redBarrierSemaphore);
+    sem_destroy(&greenBarrierSemaphore);
+    sem_destroy(&blueBarrierSemaphore);
 }
 
-void packer_set_state_array(int id, int **arr)
+void packer_set_state_array(int id, int *arr)
 {
     // assumption that the arr we pass is always size 2
     // simply sets the id into an unused spot
@@ -57,7 +57,7 @@ void packer_set_state_array(int id, int **arr)
     }
 }
 
-int packer_reset_state_array(int id, int **arr)
+int packer_reset_state_array(int id, int *arr)
 {
     // assumption that the arr we pass is always size 2
     // simply resets the array after finding the partner and returns the partner
@@ -95,7 +95,7 @@ int pack_ball(int colour, int id)
             redBalls = 0;
             // get partner ball's id
             res = packer_reset_state_array(id, redIds);
-            sem_post(&redBallSemaphore);
+            sem_post(&redBarrierSemaphore);
         }
         sem_post(&mutex);
 
@@ -106,7 +106,7 @@ int pack_ball(int colour, int id)
         }
 
         //  first ball blocks here
-        sem_wait(&redBallSemaphore);
+        sem_wait(&redBarrierSemaphore);
         sem_wait(&mutex);
         // gets partner's id
         res = packer_reset_state_array(UNUSED, redIds);
@@ -126,7 +126,7 @@ int pack_ball(int colour, int id)
             trigger = true;
             greenBalls = 0;
             res = packer_reset_state_array(id, greenIds);
-            sem_post(&greenBallSemaphore);
+            sem_post(&greenBarrierSemaphore);
         }
         sem_post(&mutex);
 
@@ -135,7 +135,7 @@ int pack_ball(int colour, int id)
             return res;
         }
 
-        sem_wait(&greenBallSemaphore);
+        sem_wait(&greenBarrierSemaphore);
         sem_wait(&mutex);
         res = packer_reset_state_array(UNUSED, greenIds);
         sem_post(&mutex);
@@ -153,7 +153,7 @@ int pack_ball(int colour, int id)
             trigger = true;
             blueBalls = 0;
             res = packer_reset_state_array(id, blueIds);
-            sem_post(&blueBallSemaphore);
+            sem_post(&blueBarrierSemaphore);
         }
         sem_post(&mutex);
 
@@ -162,7 +162,7 @@ int pack_ball(int colour, int id)
             return res;
         }
 
-        sem_wait(&blueBallSemaphore);
+        sem_wait(&blueBarrierSemaphore);
         sem_wait(&mutex);
         res = packer_reset_state_array(UNUSED, blueIds);
         sem_post(&mutex);

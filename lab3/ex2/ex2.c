@@ -15,52 +15,62 @@
 // is the colour of a ball, and the id follows.  If it is '.', that is a
 // synchronization barrier for the grader code.
 
-static void assert_malloc_succeeded(void *ptr) {
-    if (!ptr) {
+static void assert_malloc_succeeded(void *ptr)
+{
+    if (!ptr)
+    {
         fprintf(stderr, "Out of memory!\n");
         abort();
     }
 }
 
-typedef struct cmdlist {
+typedef struct cmdlist
+{
     int id;
     int colour;
     struct cmdlist *next;
 } cmdlist;
 
-static unsigned cmdlist_size(cmdlist *cmds) {
+static unsigned cmdlist_size(cmdlist *cmds)
+{
     unsigned ct = 0;
-    while (cmds) {
+    while (cmds)
+    {
         cmds = cmds->next;
         ++ct;
     }
     return ct;
 }
 
-typedef struct {
+typedef struct
+{
     atomic_uint num_ready;
     atomic_bool go;
     atomic_uint num_started;
 } busywaiter;
 
-static void busywaiter_init(busywaiter *waiter) {
+static void busywaiter_init(busywaiter *waiter)
+{
     atomic_init(&(waiter->num_ready), 0);
     atomic_init(&(waiter->go), false);
     atomic_init(&(waiter->num_started), 0);
 }
 
-static void busywaiter_destroy(busywaiter *waiter) {
+static void busywaiter_destroy(busywaiter *waiter)
+{
     (void)waiter;
 }
 
-static void busywaiter_ball_wait(busywaiter *waiter) {
+static void busywaiter_ball_wait(busywaiter *waiter)
+{
     atomic_fetch_add_explicit(&(waiter->num_ready), 1, memory_order_acq_rel);
     while (!atomic_load_explicit(&(waiter->go), memory_order_acquire))
         ;
     atomic_fetch_add_explicit(&(waiter->num_started), 1, memory_order_acq_rel);
 }
 
-static void busywaiter_main_wait(busywaiter *waiter, unsigned num_threads) {
+static void busywaiter_main_wait(busywaiter *waiter, unsigned num_threads)
+{
     while (atomic_load_explicit(&(waiter->num_ready), memory_order_acquire) !=
            num_threads)
         ;
@@ -70,7 +80,8 @@ static void busywaiter_main_wait(busywaiter *waiter, unsigned num_threads) {
         ;
 }
 
-typedef struct ballinfo {
+typedef struct ballinfo
+{
     // Set by the main thread
     int my_id;
     int my_colour;
@@ -84,7 +95,8 @@ typedef struct ballinfo {
     int other_ids[];
 } ballinfo;
 
-static void *run_ball(void *context) {
+static void *run_ball(void *context)
+{
     ballinfo *info = context;
     busywaiter_ball_wait(info->waiter);
     pack_ball(info->my_colour, info->my_id, info->other_ids);
@@ -95,7 +107,8 @@ static void *run_ball(void *context) {
     return NULL;
 }
 
-int main() {
+int main()
+{
     int balls_per_pack;
     scanf("%d", &balls_per_pack);
     packer_init(balls_per_pack);
@@ -105,14 +118,17 @@ int main() {
     pthread_mutex_t jmutex;
     pthread_mutex_init(&jmutex, NULL);
 
-    while (1) {
+    while (1)
+    {
         int res;
-        while (1) {
+        while (1)
+        {
             char ch;
             res = scanf(" %c", &ch);
             if (res < 1 || ch == '.')
                 break;
-            if (ch < '1' || ch > '3') {
+            if (ch < '1' || ch > '3')
+            {
                 fprintf(stderr, "Invalid command \"%c\"!\n", ch);
                 abort();
             }
@@ -126,13 +142,15 @@ int main() {
             cmds = new_cmd;
         }
         unsigned num_threads = cmdlist_size(cmds);
-        if (num_threads) {
+        if (num_threads)
+        {
             // these stuff to help ensure that threads start at the same time,
             // in the hope of triggering some race conditions.
             busywaiter waiter;
             busywaiter_init(&waiter);
 
-            for (cmdlist *it = cmds; it; it = it->next) {
+            for (cmdlist *it = cmds; it; it = it->next)
+            {
                 ballinfo *info = malloc(sizeof(ballinfo) +
                                         (balls_per_pack - 1) * sizeof(int));
                 assert_malloc_succeeded(info);
@@ -143,7 +161,8 @@ int main() {
                 info->jmutex = &jmutex;
                 int err;
                 if ((err = pthread_create(&(info->thread), NULL, &run_ball,
-                                          info))) {
+                                          info)))
+                {
                     fprintf(stderr, "pthread_create() failed: %d\n", err);
                     abort();
                 }
@@ -151,7 +170,8 @@ int main() {
             busywaiter_main_wait(&waiter, num_threads);
             busywaiter_destroy(&waiter);
         }
-        while (cmds) {
+        while (cmds)
+        {
             cmdlist *tmp = cmds->next;
             free(cmds);
             cmds = tmp;
@@ -159,10 +179,12 @@ int main() {
         usleep(100000); // sleep for 100ms (during grading, we will wait for at
                         // least as many balls as we expect)
         pthread_mutex_lock(&jmutex);
-        while (jlist) {
+        while (jlist)
+        {
             printf("Ball %d was matched with balls %d", jlist->my_id,
                    jlist->other_ids[0]);
-            for (int i = 1; i + 1 < balls_per_pack; ++i) {
+            for (int i = 1; i + 1 < balls_per_pack; ++i)
+            {
                 printf(", %d", jlist->other_ids[i]);
             }
             printf("\n");
