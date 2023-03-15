@@ -14,6 +14,9 @@ sem_t mutex;
 sem_t redBarrierSemaphore;
 sem_t greenBarrierSemaphore;
 sem_t blueBarrierSemaphore;
+sem_t redCountingSemaphore;
+sem_t greenCountingSemaphore;
+sem_t blueCountingSemaphore;
 int redBalls;
 int greenBalls;
 int blueBalls;
@@ -29,6 +32,9 @@ void packer_init(void)
     sem_init(&redBarrierSemaphore, 0, 0);
     sem_init(&greenBarrierSemaphore, 0, 0);
     sem_init(&blueBarrierSemaphore, 0, 0);
+    sem_init(&redCountingSemaphore, 0, 2);
+    sem_init(&greenCountingSemaphore, 0, 2);
+    sem_init(&blueCountingSemaphore, 0, 2);
     redBalls = 0;
     greenBalls = 0;
     blueBalls = 0;
@@ -41,6 +47,9 @@ void packer_destroy(void)
     sem_destroy(&redBarrierSemaphore);
     sem_destroy(&greenBarrierSemaphore);
     sem_destroy(&blueBarrierSemaphore);
+    sem_destroy(&redCountingSemaphore);
+    sem_destroy(&greenCountingSemaphore);
+    sem_destroy(&blueCountingSemaphore);
 }
 
 void packer_set_state_array(int id, int *arr)
@@ -57,31 +66,33 @@ void packer_set_state_array(int id, int *arr)
     }
 }
 
-int packer_reset_state_array(int id, int *arr)
+int packer_read_state_array(int id, int *arr)
 {
-    // assumption that the arr we pass is always size 2
-    // simply resets the array after finding the partner and returns the partner
-    int res;
+    // assumption that the arr we pass is always size 2, so just find the other elem
     if (arr[0] == id)
     {
-        res = arr[1];
-        arr[1] = UNUSED;
+        return arr[1];
     }
     else
     {
-        res = arr[0];
-        arr[0] = UNUSED;
+        return arr[0];
     }
-    return res;
+}
+
+void packer_reset_state_array(int *arr)
+{
+    // simply resets the array after being used for the next batch
+    arr[0] = UNUSED;
+    arr[1] = UNUSED;
 }
 
 int pack_ball(int colour, int id)
 {
-    bool trigger = false;
     int res;
     if (colour == RED)
     {
         // red ball
+        sem_wait(&redCountingSemaphore);
         sem_wait(&mutex);
         redBalls++;
         // save ids
@@ -90,26 +101,26 @@ int pack_ball(int colour, int id)
         // only the second ball triggers this barrier
         if (redBalls == 2)
         {
-            // only the second ball has the responsibility of resetting shared state
-            trigger = true;
-            redBalls = 0;
-            // get partner ball's id
-            res = packer_reset_state_array(id, redIds);
             sem_post(&redBarrierSemaphore);
         }
         sem_post(&mutex);
-
-        if (trigger)
-        {
-            // only for the second ball to terminate as we already got our partner's id
-            return res;
-        }
 
         //  first ball blocks here
         sem_wait(&redBarrierSemaphore);
         sem_wait(&mutex);
         // gets partner's id
-        res = packer_reset_state_array(UNUSED, redIds);
+        res = packer_read_state_array(id, redIds);
+        redBalls--;
+        if (redBalls == 0)
+        {
+            packer_reset_state_array(redIds);
+            sem_post(&redCountingSemaphore);
+            sem_post(&redCountingSemaphore);
+        }
+        else
+        {
+            sem_post(&redBarrierSemaphore);
+        }
         sem_post(&mutex);
         // does not need to signal individual semaphore as we want to reset the barrier
         return res;
@@ -117,54 +128,62 @@ int pack_ball(int colour, int id)
     else if (colour == GREEN)
     {
         // green ball
+        sem_wait(&greenCountingSemaphore);
         sem_wait(&mutex);
         greenBalls++;
         packer_set_state_array(id, greenIds);
 
         if (greenBalls == 2)
         {
-            trigger = true;
-            greenBalls = 0;
-            res = packer_reset_state_array(id, greenIds);
             sem_post(&greenBarrierSemaphore);
         }
         sem_post(&mutex);
 
-        if (trigger)
-        {
-            return res;
-        }
-
         sem_wait(&greenBarrierSemaphore);
         sem_wait(&mutex);
-        res = packer_reset_state_array(UNUSED, greenIds);
+        res = packer_read_state_array(id, greenIds);
+        greenBalls--;
+        if (greenBalls == 0)
+        {
+            packer_reset_state_array(greenIds);
+            sem_post(&greenCountingSemaphore);
+            sem_post(&greenCountingSemaphore);
+        }
+        else
+        {
+            sem_post(&greenBarrierSemaphore);
+        }
         sem_post(&mutex);
         return res;
     }
     else if (colour == BLUE)
     {
         // blue ball
+        sem_wait(&blueCountingSemaphore);
         sem_wait(&mutex);
         blueBalls++;
         packer_set_state_array(id, blueIds);
 
         if (blueBalls == 2)
         {
-            trigger = true;
-            blueBalls = 0;
-            res = packer_reset_state_array(id, blueIds);
             sem_post(&blueBarrierSemaphore);
         }
         sem_post(&mutex);
 
-        if (trigger)
-        {
-            return res;
-        }
-
         sem_wait(&blueBarrierSemaphore);
         sem_wait(&mutex);
-        res = packer_reset_state_array(UNUSED, blueIds);
+        res = packer_read_state_array(id, blueIds);
+        blueBalls--;
+        if (blueBalls == 0)
+        {
+            packer_reset_state_array(blueIds);
+            sem_post(&blueCountingSemaphore);
+            sem_post(&blueCountingSemaphore);
+        }
+        else
+        {
+            sem_post(&blueBarrierSemaphore);
+        }
         sem_post(&mutex);
         return res;
     }
