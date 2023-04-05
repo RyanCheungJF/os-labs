@@ -16,11 +16,12 @@
 
 #include "zc_io.h"
 
-#define eprintf(msg, ...)      fprintf(stderr, msg, ##__VA_ARGS__)
+#define eprintf(msg, ...) fprintf(stderr, msg, ##__VA_ARGS__)
 #define RUNNER_ERROR(msg, ...) eprintf("RUNNER ERROR: " msg, ##__VA_ARGS__)
-#define FAIL(msg, ...)         eprintf("FAIL: " msg, ##__VA_ARGS__)
+#define FAIL(msg, ...) eprintf("FAIL: " msg, ##__VA_ARGS__)
 
-struct thread_data {
+struct thread_data
+{
     zc_file *file;
     size_t op_size;
 };
@@ -34,26 +35,30 @@ static char path1[32], path2[32], path3[32];
 static char randdata[5 * 1024 * 1024];
 static char scratch[5 * 1024 * 1024];
 
-static void unlink_paths(void) {
+static void unlink_paths(void)
+{
     unlink(path1);
     unlink(path2);
     unlink(path3);
 }
 
 #define FAIL_IF(cond, msg, ...)                 \
-    do {                                        \
-        if (cond) {                             \
+    do                                          \
+    {                                           \
+        if (cond)                               \
+        {                                       \
             FAIL("thread " msg, ##__VA_ARGS__); \
             unlink_paths();                     \
             _Exit(1);                           \
         }                                       \
     } while (0)
 
-static void *threadfn(void *datav) {
+static void *threadfn(void *datav)
+{
     struct thread_data *data = (struct thread_data *)datav;
-    zc_file *zcfile          = data->file;
-    const size_t op_size     = data->op_size;
-    size_t real_read_size    = op_size;
+    zc_file *zcfile = data->file;
+    const size_t op_size = data->op_size;
+    size_t real_read_size = op_size;
     free(datav);
 
     pthread_barrier_wait(&barrier);
@@ -68,13 +73,13 @@ static void *threadfn(void *datav) {
     pthread_barrier_wait(&barrier);
 
     pthread_barrier_wait(&barrier);
-    read           = zc_write_start(zcfile, op_size);
+    read = zc_write_start(zcfile, op_size);
     thread_counter = 1;
     zc_write_end(zcfile);
     pthread_barrier_wait(&barrier);
 
     pthread_barrier_wait(&barrier);
-    read           = zc_write_start(zcfile, op_size);
+    read = zc_write_start(zcfile, op_size);
     thread_counter = 1;
     zc_write_end(zcfile);
     pthread_barrier_wait(&barrier);
@@ -84,39 +89,48 @@ static void *threadfn(void *datav) {
 
 #undef FAIL_IF
 
-static ssize_t fstat_size(int fd) {
+static ssize_t fstat_size(int fd)
+{
     struct stat stat = {0};
-    if (fstat(fd, &stat)) {
+    if (fstat(fd, &stat))
+    {
         return -1;
     }
     return stat.st_size;
 }
 
-static void catch_signal(int signum) {
+static void catch_signal(int signum)
+{
     (void)signum;
     // this is totally not safe but who cares, we're already going to die
     FAIL("caught %s, exiting\n", strsignal(signum));
     _Exit(1);
 }
 
-static void fill_buffer(void *const buf, size_t bytes) {
+static void fill_buffer(void *const buf, size_t bytes)
+{
     int32_t *cur = buf, *const end = (int32_t *)buf + bytes / sizeof(int32_t);
-    for (; cur < end; ++cur) {
+    for (; cur < end; ++cur)
+    {
         *cur = (int32_t)lrand48();
     }
 }
 
 #define RUNNER_ERROR_IF(cond, msg, ...)       \
-    do {                                      \
-        if (cond) {                           \
+    do                                        \
+    {                                         \
+        if (cond)                             \
+        {                                     \
             RUNNER_ERROR(msg, ##__VA_ARGS__); \
             goto exit;                        \
         }                                     \
     } while (0)
 
 #define FAIL_IF(cond, msg, ...)       \
-    do {                              \
-        if (cond) {                   \
+    do                                \
+    {                                 \
+        if (cond)                     \
+        {                             \
             FAIL(msg, ##__VA_ARGS__); \
             goto exit;                \
         }                             \
@@ -125,14 +139,16 @@ static void fill_buffer(void *const buf, size_t bytes) {
 #define GEN_SIZE() ((size_t)(1024 + lrand48() % 1048576))
 
 #define TRUNCATE_FILE(file, size)                                   \
-    do {                                                            \
+    do                                                              \
+    {                                                               \
         rewind(file);                                               \
         RUNNER_ERROR_IF(ftruncate(fileno(file), size),              \
                         "ftruncate failed: %s\n", strerror(errno)); \
     } while (0)
 
 #define FILL_FILE(file, size)                                    \
-    do {                                                         \
+    do                                                           \
+    {                                                            \
         rewind(file);                                            \
         TRUNCATE_FILE(file, size);                               \
         RUNNER_ERROR_IF(fwrite(randdata, 1, size, file) != size, \
@@ -141,12 +157,16 @@ static void fill_buffer(void *const buf, size_t bytes) {
         rewind(file);                                            \
     } while (0)
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     int retv = 1;
     long seed;
-    if (argc >= 2) {
+    if (argc >= 2)
+    {
         seed = atol(argv[1]);
-    } else {
+    }
+    else
+    {
         struct timespec t = {0};
         clock_gettime(CLOCK_REALTIME, &t);
         seed = t.tv_nsec ^ t.tv_sec;
@@ -206,7 +226,8 @@ int main(int argc, char *argv[]) {
         FAIL_IF(!zcfile, "zc_open %s failed\n", path1);
 
         size_t offset = 0;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < 5; ++i)
+        {
             const size_t read_size =
                 i == 4 ? size : (size_t)(lrand48() % ((size >> 2) - 16));
             const size_t expected_read_size =
@@ -215,7 +236,7 @@ int main(int argc, char *argv[]) {
             eprintf("reading %zu from expected offset %zu\n", read_size,
                     offset);
             size_t real_read_size = read_size;
-            const char *read_ptr  = zc_read_start(zcfile, &real_read_size);
+            const char *read_ptr = zc_read_start(zcfile, &real_read_size);
             FAIL_IF(real_read_size != expected_read_size,
                     "zc_read returned wrong size - expected %zu, got %zu\n",
                     expected_read_size, real_read_size);
@@ -242,7 +263,8 @@ int main(int argc, char *argv[]) {
         FAIL_IF(!zcfile, "zc_open %s failed\n", path1);
 
         size_t offset = 0;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < 5; ++i)
+        {
             // for 5th iteration, extend the file
             const size_t write_size =
                 i == 4 ? (size - offset + 1024)
@@ -293,7 +315,8 @@ int main(int argc, char *argv[]) {
         setvbuf(file2, NULL, _IONBF, 0);
 
         size_t offset = 0;
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 4; ++i)
+        {
             const size_t write_size = (size_t)(lrand48() % ((size >> 2) - 16));
             eprintf("writing %zu to expected offset %zu\n", write_size, offset);
 
@@ -321,9 +344,10 @@ int main(int argc, char *argv[]) {
     eprintf("test 2b passed\n\n");
 
 #define TEST3_READ(_____sz)                                                   \
-    do {                                                                      \
+    do                                                                        \
+    {                                                                         \
         const size_t read_size = _____sz;                                     \
-        size_t real_read_size  = read_size;                                   \
+        size_t real_read_size = read_size;                                    \
         eprintf("reading %zu from expected offset %zu\n", read_size, offset); \
         const char *read_ptr = zc_read_start(zcfile, &real_read_size);        \
         FAIL_IF(real_read_size != read_size,                                  \
@@ -337,7 +361,8 @@ int main(int argc, char *argv[]) {
     } while (0)
 
 #define TEST3_WRITE(_____sz)                                                   \
-    do {                                                                       \
+    do                                                                         \
+    {                                                                          \
         const size_t write_size = _____sz;                                     \
         eprintf("writing %zu to expected offset %zu\n", write_size, offset);   \
         char *write_ptr = zc_write_start(zcfile, write_size);                  \
@@ -357,7 +382,8 @@ int main(int argc, char *argv[]) {
     } while (0)
 
 #define TEST3_SEEK(f, o, s)                                                 \
-    do {                                                                    \
+    do                                                                      \
+    {                                                                       \
         const off_t seek_result = zc_lseek(f, o, s);                        \
         FAIL_IF(seek_result == -1, "zc_lseek returned -1\n");               \
         FAIL_IF((size_t)seek_result != offset,                              \
@@ -436,9 +462,11 @@ int main(int argc, char *argv[]) {
     eprintf("test 4 passed\n");
 
 #define TEST5_WAITUNTIL(cond, ms)                                    \
-    do {                                                             \
+    do                                                               \
+    {                                                                \
         counter = 0;                                                 \
-        while (counter < (ms) && !(cond)) {                          \
+        while (counter < (ms) && !(cond))                            \
+        {                                                            \
             nanosleep(&(struct timespec){.tv_nsec = 1000000}, NULL); \
             ++counter;                                               \
         }                                                            \
@@ -448,7 +476,7 @@ int main(int argc, char *argv[]) {
             "*** NOTE: if runner hangs for more than a few seconds,\n"
             "*** you probably have a synchronisation problem\n");
     {
-        size_t counter    = 0;
+        size_t counter = 0;
         const size_t size = GEN_SIZE();
         FILL_FILE(file1, size);
         eprintf("filling file with %zu bytes\n", size);
@@ -458,7 +486,7 @@ int main(int argc, char *argv[]) {
         FAIL_IF(!zcfile, "zc_open %s failed\n", path1);
 
         // acquire simultaneous reads
-        const size_t op_size  = (size_t)(lrand48() % ((size >> 3) - 16));
+        const size_t op_size = (size_t)(lrand48() % ((size >> 3) - 16));
         size_t real_read_size = op_size;
         eprintf("acquiring 2 reads of %zu from the same thread\n", op_size);
         const char *read1 = zc_read_start(zcfile, &real_read_size);
@@ -532,7 +560,7 @@ int main(int argc, char *argv[]) {
 
         eprintf("acquiring write of %zu from separate threads\n", op_size);
         thread_counter = 0;
-        read1          = zc_write_start(zcfile, op_size);
+        read1 = zc_write_start(zcfile, op_size);
         // barrier 5, then they acquire
         pthread_barrier_wait(&barrier);
         // wait 500ms, be reasonably sure they are blocked
@@ -557,18 +585,22 @@ int main(int argc, char *argv[]) {
     retv = 0;
 
 exit:
-    if (file1) {
+    if (file1)
+    {
         fclose(file1);
     }
-    if (file2) {
+    if (file2)
+    {
         fclose(file2);
     }
-    if (file3) {
+    if (file3)
+    {
         fclose(file3);
     }
     unlink_paths();
 
-    if (!retv) {
+    if (!retv)
+    {
         return 0;
     }
     _Exit(retv);
