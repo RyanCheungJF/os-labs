@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -174,8 +175,30 @@ void zc_write_end(zc_file *file)
 
 off_t zc_lseek(zc_file *file, long offset, int whence)
 {
-    // To implement
-    return -1;
+    off_t newOffset;
+    if (whence == SEEK_SET)
+    {
+        newOffset = (off_t)offset;
+    }
+    else if (whence == SEEK_CUR)
+    {
+        newOffset = (off_t)file->fileOffset + offset;
+    }
+    else if (whence == SEEK_END)
+    {
+        newOffset = (off_t)file->fileSize + offset;
+    }
+    else
+    {
+        perror("ERROR: whence value in seek is invalid!\n");
+        return -1;
+    }
+    if (newOffset < 0)
+    {
+        return -1;
+    }
+    file->fileOffset = newOffset;
+    return newOffset;
 }
 
 /**************
@@ -184,8 +207,23 @@ off_t zc_lseek(zc_file *file, long offset, int whence)
 
 int zc_copyfile(const char *source, const char *dest)
 {
-    // To implement
-    return -1;
+    // open or create the files
+    zc_file *src = zc_open(source);
+    zc_file *dst = zc_open(dest);
+
+    // allocate space as per memory and copy
+    zc_read_start(src, &(src->fileSize));
+    zc_write_start(dst, src->fileSize);
+    memcpy(dst->fileLocation, src->fileLocation, src->fileSize);
+
+    // close the files once done
+    int closeSrc = zc_close(src);
+    int closeDst = zc_close(dst);
+    if (closeSrc == -1 || closeDst == -1)
+    {
+        return -1;
+    }
+    return 0;
 }
 
 /**************
