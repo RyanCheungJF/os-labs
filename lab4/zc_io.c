@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,6 +23,11 @@ struct zc_file
     // file descriptor for the opened file
     int fileDescriptor;
     // mutex for access to the memory space and number of readers
+    sem_t mutex;
+    // mutex to allow multiple readers to read at one go but disallow other operations
+    sem_t readMutex;
+    // counter to keep track of the number of readers
+    int readers;s
 };
 
 /**************
@@ -32,6 +38,14 @@ zc_file *zc_open(const char *path)
 {
     // initialize file structure
     zc_file *file = (zc_file *)malloc(sizeof(zc_file));
+    // initialize mutex
+    sem_t mutex;
+    sem_t readMutex;
+    sem_init(&mutex, 0, 1);
+    sem_init(&readMutex, 0, 1);
+    file->mutex = mutex;
+    file->readMutex = readMutex;
+    file->readers = 0;
 
     // creates file from path with read write exec permissions if it does not exist, else open
     int fd = open(path, O_CREAT | O_RDWR, 00700);
@@ -95,11 +109,22 @@ int zc_close(zc_file *file)
         return -1;
     }
 
+    sem_destroy(&file->mutex);
+    sem_destroy(&file->readMutex);
     return fileStatus;
 }
 
 const char *zc_read_start(zc_file *file, size_t *size)
 {
+    sem_wait(&file->readMutex);
+    file->readers++;
+    // only for the very first reader, basically to activate and to lock the shared mutex
+    if (file->readers == 1)
+    {
+        sem_wait(&file->mutex);
+    }
+    sem_post(&file->readMutex);
+
     size_t remainingSize = file->fileSize - file->fileOffset;
     // if size remaining is less than size to be read, update size so we don't read out of bounds
     // remember! size is a ptr, to dereference it use *size, to get the addr of a var i, use int* ptr = &i
@@ -116,11 +141,19 @@ const char *zc_read_start(zc_file *file, size_t *size)
 
 void zc_read_end(zc_file *file)
 {
-    // To implement
+    sem_wait(&file->readMutex);
+    file->readers--;
+    // only for the very last reader leaving, basically to activate and unlock the shared mutex
+    if (file->readers == 0)
+    {
+        sem_post(&file->mutex);
+    }
+    sem_post(&file->readMutex);
 }
 
 char *zc_write_start(zc_file *file, size_t size)
 {
+    sem_wait(&file->mutex);
     // cond 1: if file size is 0, it means we initially created a new file, and now want to write to it, so create virtual memory
     // cond 2: alternatively, we have a pre existing file but of insufficient space
     if (file->fileSize == 0 || file->fileOffset + size > file->fileSize)
@@ -162,6 +195,7 @@ char *zc_write_start(zc_file *file, size_t size)
 
 void zc_write_end(zc_file *file)
 {
+    sem_post(&file->mutex);
     int syncStatus = msync(file->fileLocation, file->fileSize, MS_SYNC);
     if (syncStatus == -1)
     {
@@ -175,6 +209,7 @@ void zc_write_end(zc_file *file)
 
 off_t zc_lseek(zc_file *file, long offset, int whence)
 {
+    sem_wait(&file->mutex);
     off_t newOffset;
     if (whence == SEEK_SET)
     {
@@ -198,6 +233,7 @@ off_t zc_lseek(zc_file *file, long offset, int whence)
         return -1;
     }
     file->fileOffset = newOffset;
+    sem_post(&file->mutex);
     return newOffset;
 }
 
