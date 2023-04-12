@@ -27,7 +27,7 @@ struct zc_file
     // mutex to allow multiple readers to read at one go but disallow other operations
     sem_t readMutex;
     // counter to keep track of the number of readers
-    int readers;s
+    int readers;
 };
 
 /**************
@@ -210,6 +210,10 @@ void zc_write_end(zc_file *file)
 off_t zc_lseek(zc_file *file, long offset, int whence)
 {
     sem_wait(&file->mutex);
+    if (file == NULL)
+    {
+        return -1;
+    }
     off_t newOffset;
     if (whence == SEEK_SET)
     {
