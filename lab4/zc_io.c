@@ -154,6 +154,11 @@ void zc_read_end(zc_file *file)
 char *zc_write_start(zc_file *file, size_t size)
 {
     sem_wait(&file->mutex);
+    // if file offset is more than file size, fill with NULL from EOF onwards
+    if (file->fileOffset > file->fileSize)
+    {
+        memset(file->fileLocation + file->fileSize, '\0', file->fileOffset - file->fileSize);
+    }
     // cond 1: if file size is 0, it means we initially created a new file, and now want to write to it, so create virtual memory
     // cond 2: alternatively, we have a pre existing file but of insufficient space
     if (file->fileSize == 0 || file->fileOffset + size > file->fileSize)
